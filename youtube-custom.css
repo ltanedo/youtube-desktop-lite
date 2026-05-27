@@ -1,0 +1,32 @@
+/* Custom CSS to force the YouTube top bar (masthead) to be black */
+#masthead-container,
+ytd-masthead,
+#container.ytd-masthead,
+#background.ytd-masthead {
+  background-color: #000000 !important;
+  background: #000000 !important;
+  border-bottom: 1px solid #1f1f1f !important;
+}
+
+/* Ensure text, inputs, and icons in the top bar remain readable (light/white) on the black background */
+#masthead-container ytd-searchbox #search-icon-legacy,
+#masthead-container yt-icon,
+#masthead-container button,
+#masthead-container a,
+#masthead-container .yt-spec-icon-shape,
+#masthead-container #country-code {
+  color: #ffffff !important;
+  --yt-icon-color: #ffffff !important;
+  --iron-icon-fill-color: #ffffff !important;
+  fill: #ffffff !important;
+}
+
+#masthead-container input {
+  color: #ffffff !important;
+}
+
+/* Style the search box to blend well with the black top bar */
+#search-form {
+  border-color: #333333 !important;
+  background-color: #121212 !important;
+}
