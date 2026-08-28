@@ -30,3 +30,16 @@ ytd-masthead,
   border-color: #333333 !important;
   background-color: #121212 !important;
 }
+
+/*
+ * WebView2 can promote an edge-to-edge fullscreen video to a hardware overlay
+ * above YouTube's separately painted controls and captions. A two-pixel inset
+ * keeps hardware decoding but prevents that broken full-surface overlay path.
+ */
+#movie_player.ytp-fullscreen video.html5-main-video {
+  top: 2px !important;
+  left: 2px !important;
+  width: calc(100% - 4px) !important;
+  height: calc(100% - 4px) !important;
+  object-fit: contain !important;
+}
