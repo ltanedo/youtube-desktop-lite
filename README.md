@@ -13,7 +13,7 @@ Unlike bulky Electron-based wrappers, this application uses the operating system
 - **Custom Dark Title Bar (Fix Applied):** Features a customized dark window frame to match YouTube's dark mode, preventing the default glaring white Windows title bar.
 - **Custom Style Injection:** Integrates a custom CSS style injector to style elements (such as making the top bar solid black and adjusting search input visibility).
 - **High-DPI Zoom Reflow:** Injects `youtube-reflow.js` so the YouTube player recalculates its size after Pake/WebView2 zoom changes.
-- **Fullscreen Overlay Fix:** Keeps YouTube controls and closed captions above fullscreen video in WebView2.
+- **Native-Like Fullscreen:** Injects `youtube-fullscreen.js` so Pake enters native window fullscreen without moving YouTube's video away from its controls and captions.
 
 ---
 
@@ -51,6 +51,16 @@ Applying this patch allows the `--dark-mode` flag on the CLI to instruct the Win
 
 ---
 
+## Windows Fullscreen Controls and Captions Fix
+
+Pake 3.15.7's fullscreen polyfill handles a fullscreen request on the page root by detaching the largest `<video>` element and moving it directly under `<body>`. On YouTube, this separates the video from the player controls and caption overlays.
+
+The injected `youtube-fullscreen.js` performs no DOM reparenting. It overrides Pake's polyfill, changes the native Tauri window's fullscreen state, reports the expected Fullscreen API properties, and dispatches the standard events YouTube uses to update its layout. YouTube therefore remains responsible for sizing the complete player and showing its controls and captions.
+
+This approach is adapted for Windows from the no-DOM-surgery fix developed in [`sssmolkni/pake-youtube-pip`](https://github.com/sssmolkni/pake-youtube-pip/commit/6e6df671687e73ca4ad38e14e99a1199fc827af8) for the known [Pake fullscreen limitation](https://github.com/tw93/Pake/issues/1113).
+
+---
+
 ## How to Build
 
 1. **Install Pake CLI:**
@@ -61,7 +71,7 @@ Applying this patch allows the `--dark-mode` flag on the CLI to instruct the Win
 2. **Generate the App:**
    Clone this repository, navigate to the folder, and run:
    ```bash
-   npx pake-cli@latest https://www.youtube.com --name "YouTube" --identifier "com.pake.a1c202c" --inject youtube-custom.css,youtube-reflow.js --width 1280 --height 800 --min-width 720 --min-height 480 --maximize --dark-mode --app-version 0.1.2 --keep-binary
+   npx pake-cli@3.15.7 https://www.youtube.com --name "YouTube" --identifier "com.pake.a1c202c" --inject youtube-custom.css,youtube-reflow.js,youtube-fullscreen.js --width 1280 --height 800 --min-width 720 --min-height 480 --maximize --dark-mode --app-version 0.1.3 --keep-binary
    ```
 
 3. **Output:**
