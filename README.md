@@ -12,6 +12,7 @@ Unlike bulky Electron-based wrappers, this application uses the operating system
 - **Native Look & Feel:** Standard OS window borders are hidden/styled to integrate smoothly with the player window.
 - **Custom Dark Title Bar (Fix Applied):** Features a customized dark window frame to match YouTube's dark mode, preventing the default glaring white Windows title bar.
 - **Custom Style Injection:** Integrates a custom CSS style injector to style elements (such as making the top bar solid black and adjusting search input visibility).
+- **High-DPI Zoom Reflow:** Injects `youtube-reflow.js` so the YouTube player recalculates its size after Pake/WebView2 zoom changes.
 
 ---
 
@@ -59,7 +60,7 @@ Applying this patch allows the `--dark-mode` flag on the CLI to instruct the Win
 2. **Generate the App:**
    Clone this repository, navigate to the folder, and run:
    ```bash
-   pake https://www.youtube.com --name "YouTube" --inject youtube-custom.css --hide-title-bar --dark-mode
+   npx pake-cli@latest https://www.youtube.com --name "YouTube" --identifier "com.pake.a1c202c" --inject youtube-custom.css,youtube-reflow.js --width 1280 --height 800 --min-width 720 --min-height 480 --maximize --dark-mode --app-version 0.1.1 --keep-binary
    ```
 
 3. **Output:**
