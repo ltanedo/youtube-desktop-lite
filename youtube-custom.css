@@ -44,7 +44,7 @@ video.html5-main-video.pake-ultrawide-fill {
 /* Compositor-only cover used while the native window changes fullscreen state. */
 #pake-fullscreen-fade {
   position: fixed;
-  inset: 0;
+  inset: -8px;
   z-index: 2147483647;
   background: #000000;
   opacity: 0;
@@ -55,6 +55,23 @@ video.html5-main-video.pake-ultrawide-fill {
 
 #pake-fullscreen-fade.pake-fullscreen-fade-visible {
   opacity: 1;
+}
+
+/* Prevent stale scrollbars and exposed document pixels during native resize. */
+html.pake-fullscreen-transition,
+html.pake-fullscreen-transition body {
+  overflow: hidden !important;
+  background: #000000 !important;
+  overscroll-behavior: none !important;
+  scrollbar-width: none !important;
+}
+
+html.pake-fullscreen-transition::-webkit-scrollbar,
+html.pake-fullscreen-transition body::-webkit-scrollbar,
+html.pake-fullscreen-transition *::-webkit-scrollbar {
+  width: 0 !important;
+  height: 0 !important;
+  display: none !important;
 }
 
 #pake-ultrawide-toast {

@@ -15,6 +15,7 @@ Unlike bulky Electron-based wrappers, this application uses the operating system
 - **High-DPI Zoom Reflow:** Injects `youtube-reflow.js` so the YouTube player recalculates its size after Pake/WebView2 zoom changes.
 - **Native-Like Fullscreen:** Injects `youtube-fullscreen.js` so Pake enters native window fullscreen without moving YouTube's video away from its controls and captions.
 - **Smooth Fullscreen Fade:** Covers the WebView with a short Firefox-style black fade while Windows changes fullscreen state.
+- **Flash-Free Transitions:** Hides stale scrollbars and uses black document, WebView, and native window surfaces throughout fullscreen resizing.
 - **Ultrawide Fill:** Press **D** in fullscreen to zoom a 16:9 video until it fills an ultrawide display. Press it again to restore normal letterboxing. The setting persists between launches.
 
 ---
@@ -61,6 +62,10 @@ The injected `youtube-fullscreen.js` performs no DOM reparenting. It overrides P
 
 This approach is adapted for Windows from the no-DOM-surgery fix developed in [`sssmolkni/pake-youtube-pip`](https://github.com/sssmolkni/pake-youtube-pip/commit/6e6df671687e73ca4ad38e14e99a1199fc827af8) for the known [Pake fullscreen limitation](https://github.com/tw93/Pake/issues/1113).
 
+### Native black transition surface
+
+WebView2 can briefly expose its native background before the resized page is painted. To prevent a white strip from appearing at a window edge, apply [`pake-native-black-background.patch`](pake-native-black-background.patch) to Pake 3.15.7 before building. It sets both the Tauri window and WebView backgrounds to black; the injected transition CSS separately covers the page and suppresses stale scrollbars.
+
 ### Ultrawide fullscreen
 
 While a 16:9 video is fullscreen on an ultrawide monitor, press **D** to toggle **Fill ultrawide**. The mode uniformly scales the video surface to fill the screen width, which crops the top and bottom of the picture. It does not resize or move YouTube's player, controls, or caption layers. Videos that are not approximately 16:9 are left unchanged. The preference is cached in YouTube's local storage and automatically restored whenever the app restarts.
@@ -77,7 +82,7 @@ While a 16:9 video is fullscreen on an ultrawide monitor, press **D** to toggle 
 2. **Generate the App:**
    Clone this repository, navigate to the folder, and run:
    ```bash
-npx pake-cli@3.15.7 https://www.youtube.com --name "YouTube" --identifier "com.pake.a1c202c" --inject youtube-custom.css,youtube-reflow.js,youtube-fullscreen.js --width 1280 --height 800 --min-width 720 --min-height 480 --maximize --dark-mode --app-version 0.1.8 --keep-binary
+npx pake-cli@3.15.7 https://www.youtube.com --name "YouTube" --identifier "com.pake.a1c202c" --inject youtube-custom.css,youtube-reflow.js,youtube-fullscreen.js --width 1280 --height 800 --min-width 720 --min-height 480 --maximize --dark-mode --app-version 0.1.9 --keep-binary
    ```
 
 3. **Output:**

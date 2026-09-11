@@ -1,0 +1,15 @@
+diff --git a/src-tauri/src/app/window.rs b/src-tauri/src/app/window.rs
+--- a/src-tauri/src/app/window.rs
++++ b/src-tauri/src/app/window.rs
+@@ -417,7 +417,10 @@
+         .visible(visible)
+         .user_agent(user_agent)
+         .resizable(window_config.resizable)
+-        .maximized(window_config.maximize);
++        .maximized(window_config.maximize)
++        // Keep the native window and WebView surfaces black if WebView2 has
++        // not painted the resized page yet during fullscreen transitions.
++        .background_color(tauri::webview::Color(0, 0, 0, 255));
+ 
+     #[cfg(target_os = "windows")]
+     {

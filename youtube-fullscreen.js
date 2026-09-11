@@ -70,7 +70,15 @@
       window.requestAnimationFrame(function () {
         window.requestAnimationFrame(function () {
           layer.classList.add('pake-fullscreen-fade-visible');
-          setTimeout(resolve, 200);
+          setTimeout(function () {
+            // Once the page is fully covered, hide its scrollbars before the
+            // native viewport changes size. This prevents WebView2 from
+            // briefly painting a stale vertical scrollbar during the resize.
+            document.documentElement.classList.add(
+              'pake-fullscreen-transition',
+            );
+            resolve();
+          }, 200);
         });
       });
     });
@@ -84,6 +92,11 @@
     fullscreenFadeOutTimer = setTimeout(function () {
       fullscreenFadeOutTimer = 0;
       window.requestAnimationFrame(function () {
+        // Restore the settled page behind the still-opaque cover, then reveal
+        // both the page and its correct post-transition scrollbar state.
+        document.documentElement.classList.remove(
+          'pake-fullscreen-transition',
+        );
         layer.classList.remove('pake-fullscreen-fade-visible');
         clearTimeout(fullscreenFadeCleanupTimer);
         fullscreenFadeCleanupTimer = setTimeout(function () {
@@ -93,6 +106,9 @@
           ) {
             layer.parentNode.removeChild(layer);
           }
+          document.documentElement.classList.remove(
+            'pake-fullscreen-transition',
+          );
         }, 260);
       });
     }, delay || 0);
