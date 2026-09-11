@@ -13,6 +13,14 @@
   var operationToken = 0;
   var operationPending = false;
   var enteredAt = 0;
+  var ultrawideVideo = null;
+  var ultrawideToastTimer = 0;
+  var ultrawideFillEnabled = false;
+
+  try {
+    ultrawideFillEnabled =
+      localStorage.getItem('pake-youtube-ultrawide-fill') === '1';
+  } catch (error) {}
 
   function appWindow() {
     return window.__TAURI__ && window.__TAURI__.window
@@ -36,10 +44,104 @@
     dispatchEvents(target, 'fullscreenerror', 'webkitfullscreenerror');
   }
 
+  function clearUltrawideFill() {
+    if (!ultrawideVideo) return;
+    ultrawideVideo.classList.remove('pake-ultrawide-fill');
+    ultrawideVideo.style.removeProperty('--pake-ultrawide-scale');
+    ultrawideVideo = null;
+  }
+
+  function updateUltrawideFill() {
+    if (!fullscreenElement || !ultrawideFillEnabled) {
+      clearUltrawideFill();
+      return 'off';
+    }
+
+    var player = document.getElementById('movie_player');
+    var video = player && player.querySelector('video.html5-main-video');
+    if (!player || !video || !video.videoWidth || !video.videoHeight) {
+      clearUltrawideFill();
+      return 'waiting';
+    }
+
+    var sourceAspect = video.videoWidth / video.videoHeight;
+    if (Math.abs(sourceAspect - 16 / 9) > 0.1) {
+      clearUltrawideFill();
+      return 'not-16-9';
+    }
+
+    var bounds = player.getBoundingClientRect();
+    var targetWidth = bounds.width || window.innerWidth;
+    var targetHeight = bounds.height || window.innerHeight;
+    var targetAspect = targetWidth / targetHeight;
+
+    // Leave 16:9 and 16:10 displays alone. On a wider display, scale the
+    // already centered video uniformly so it fills the player horizontally.
+    // CSS `scale` changes only painting, not YouTube's layout calculations.
+    if (!isFinite(targetAspect) || targetAspect <= sourceAspect + 0.12) {
+      clearUltrawideFill();
+      return 'not-ultrawide';
+    }
+
+    if (ultrawideVideo && ultrawideVideo !== video) clearUltrawideFill();
+
+    var scale = Math.min(2, targetAspect / sourceAspect);
+    video.style.setProperty('--pake-ultrawide-scale', scale.toFixed(5));
+    video.classList.add('pake-ultrawide-fill');
+    ultrawideVideo = video;
+    return 'active';
+  }
+
+  function showUltrawideToast(message) {
+    var toast = document.getElementById('pake-ultrawide-toast');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'pake-ultrawide-toast';
+      document.body.appendChild(toast);
+    }
+
+    toast.textContent = message;
+    toast.classList.add('pake-ultrawide-toast-visible');
+    clearTimeout(ultrawideToastTimer);
+    ultrawideToastTimer = setTimeout(function () {
+      toast.classList.remove('pake-ultrawide-toast-visible');
+    }, 1800);
+  }
+
+  function toggleUltrawideFill() {
+    ultrawideFillEnabled = !ultrawideFillEnabled;
+    try {
+      localStorage.setItem(
+        'pake-youtube-ultrawide-fill',
+        ultrawideFillEnabled ? '1' : '0',
+      );
+    } catch (error) {}
+
+    var status = updateUltrawideFill();
+    if (!ultrawideFillEnabled) {
+      showUltrawideToast('Fill ultrawide: Off');
+    } else if (status === 'not-16-9') {
+      showUltrawideToast('Fill ultrawide: 16:9 videos only');
+    } else if (status === 'not-ultrawide') {
+      showUltrawideToast('Fill ultrawide: On (waiting for ultrawide)');
+    } else {
+      showUltrawideToast('Fill ultrawide: On');
+    }
+  }
+
+  function isEditableTarget(target) {
+    if (!target || target.nodeType !== 1) return false;
+    return (
+      target.isContentEditable ||
+      /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)
+    );
+  }
+
   function nudgeLayout() {
     [50, 350, 700].forEach(function (delay) {
       setTimeout(function () {
         window.dispatchEvent(new Event('resize'));
+        updateUltrawideFill();
       }, delay);
     });
   }
@@ -87,6 +189,7 @@
 
     var element = fullscreenElement;
     fullscreenElement = null;
+    clearUltrawideFill();
     var token = ++operationToken;
     var win = appWindow();
 
@@ -123,6 +226,19 @@
         event.preventDefault();
         event.stopImmediatePropagation();
         exitFullscreen();
+      } else if (
+        fullscreenElement &&
+        !event.repeat &&
+        !event.shiftKey &&
+        !event.ctrlKey &&
+        !event.altKey &&
+        !event.metaKey &&
+        !isEditableTarget(event.target) &&
+        event.key.toLowerCase() === 'd'
+      ) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        toggleUltrawideFill();
       }
     },
     true,
@@ -131,6 +247,7 @@
   // Keep page state synchronized if fullscreen is left through native window
   // controls or another operating-system action.
   setInterval(function () {
+    updateUltrawideFill();
     if (!fullscreenElement || operationPending) return;
     if (Date.now() - enteredAt < 1500) return;
 

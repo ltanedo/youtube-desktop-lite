@@ -30,3 +30,34 @@ ytd-masthead,
   border-color: #333333 !important;
   background-color: #121212 !important;
 }
+
+/*
+ * Optional fullscreen fill for 16:9 video on ultrawide displays. The script
+ * toggles this class with D. Individual `scale` preserves YouTube's
+ * positioning transform and leaves the controls/caption layers untouched.
+ */
+video.html5-main-video.pake-ultrawide-fill {
+  scale: var(--pake-ultrawide-scale, 1) !important;
+  transform-origin: 50% 50% !important;
+}
+
+#pake-ultrawide-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 88px;
+  z-index: 2147483647;
+  padding: 10px 16px;
+  border-radius: 4px;
+  color: #ffffff;
+  background: rgba(0, 0, 0, 0.82);
+  font: 500 15px/1.2 Arial, sans-serif;
+  pointer-events: none;
+  opacity: 0;
+  translate: -50% 8px;
+  transition: opacity 120ms ease, translate 120ms ease;
+}
+
+#pake-ultrawide-toast.pake-ultrawide-toast-visible {
+  opacity: 1;
+  translate: -50% 0;
+}
