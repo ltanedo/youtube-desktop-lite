@@ -84,7 +84,7 @@
     });
   }
 
-  function fadeFromBlack(delay) {
+  function fadeFromBlack(delay, prepareReveal) {
     var layer = document.getElementById('pake-fullscreen-fade');
     if (!layer) return;
 
@@ -92,24 +92,30 @@
     fullscreenFadeOutTimer = setTimeout(function () {
       fullscreenFadeOutTimer = 0;
       window.requestAnimationFrame(function () {
-        // Restore the settled page behind the still-opaque cover, then reveal
-        // both the page and its correct post-transition scrollbar state.
-        document.documentElement.classList.remove(
-          'pake-fullscreen-transition',
-        );
-        layer.classList.remove('pake-fullscreen-fade-visible');
-        clearTimeout(fullscreenFadeCleanupTimer);
-        fullscreenFadeCleanupTimer = setTimeout(function () {
-          if (
-            layer.parentNode &&
-            !layer.classList.contains('pake-fullscreen-fade-visible')
-          ) {
-            layer.parentNode.removeChild(layer);
-          }
+        if (prepareReveal) prepareReveal();
+
+        // Give WebView2 one fully covered compositor frame to paint the final
+        // ultrawide transform before any part of the video becomes visible.
+        window.requestAnimationFrame(function () {
+          // Restore the settled page behind the still-opaque cover, then reveal
+          // both the page and its correct post-transition scrollbar state.
           document.documentElement.classList.remove(
             'pake-fullscreen-transition',
           );
-        }, 260);
+          layer.classList.remove('pake-fullscreen-fade-visible');
+          clearTimeout(fullscreenFadeCleanupTimer);
+          fullscreenFadeCleanupTimer = setTimeout(function () {
+            if (
+              layer.parentNode &&
+              !layer.classList.contains('pake-fullscreen-fade-visible')
+            ) {
+              layer.parentNode.removeChild(layer);
+            }
+            document.documentElement.classList.remove(
+              'pake-fullscreen-transition',
+            );
+          }, 260);
+        });
       });
     }, delay || 0);
   }
@@ -266,7 +272,7 @@
         nudgeLayout();
         // Tauri resolves before the Windows/WebView2 resize is visually done.
         // Keep the page covered until that native transition has settled.
-        fadeFromBlack(550);
+        fadeFromBlack(550, updateUltrawideFill);
       },
       function (error) {
         if (token === operationToken) {

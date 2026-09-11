@@ -82,7 +82,7 @@ While a 16:9 video is fullscreen on an ultrawide monitor, press **D** to toggle 
 2. **Generate the App:**
    Clone this repository, navigate to the folder, and run:
    ```bash
-npx pake-cli@3.15.7 https://www.youtube.com --name "YouTube" --identifier "com.pake.a1c202c" --inject youtube-custom.css,youtube-reflow.js,youtube-fullscreen.js --width 1280 --height 800 --min-width 720 --min-height 480 --maximize --dark-mode --app-version 0.1.9 --keep-binary
+npx pake-cli@3.15.7 https://www.youtube.com --name "YouTube" --identifier "com.pake.a1c202c" --inject youtube-custom.css,youtube-reflow.js,youtube-fullscreen.js --width 1280 --height 800 --min-width 720 --min-height 480 --maximize --dark-mode --app-version 0.1.10 --keep-binary
    ```
 
 3. **Output:**
