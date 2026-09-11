@@ -14,6 +14,7 @@ Unlike bulky Electron-based wrappers, this application uses the operating system
 - **Custom Style Injection:** Integrates a custom CSS style injector to style elements (such as making the top bar solid black and adjusting search input visibility).
 - **High-DPI Zoom Reflow:** Injects `youtube-reflow.js` so the YouTube player recalculates its size after Pake/WebView2 zoom changes.
 - **Native-Like Fullscreen:** Injects `youtube-fullscreen.js` so Pake enters native window fullscreen without moving YouTube's video away from its controls and captions.
+- **Smooth Fullscreen Fade:** Covers the WebView with a short Firefox-style black fade while Windows changes fullscreen state.
 - **Ultrawide Fill:** Press **D** in fullscreen to zoom a 16:9 video until it fills an ultrawide display. Press it again to restore normal letterboxing. The setting persists between launches.
 
 ---
@@ -76,7 +77,7 @@ While a 16:9 video is fullscreen on an ultrawide monitor, press **D** to toggle 
 2. **Generate the App:**
    Clone this repository, navigate to the folder, and run:
    ```bash
-   npx pake-cli@3.15.7 https://www.youtube.com --name "YouTube" --identifier "com.pake.a1c202c" --inject youtube-custom.css,youtube-reflow.js,youtube-fullscreen.js --width 1280 --height 800 --min-width 720 --min-height 480 --maximize --dark-mode --app-version 0.1.5 --keep-binary
+npx pake-cli@3.15.7 https://www.youtube.com --name "YouTube" --identifier "com.pake.a1c202c" --inject youtube-custom.css,youtube-reflow.js,youtube-fullscreen.js --width 1280 --height 800 --min-width 720 --min-height 480 --maximize --dark-mode --app-version 0.1.8 --keep-binary
    ```
 
 3. **Output:**

@@ -41,11 +41,27 @@ video.html5-main-video.pake-ultrawide-fill {
   transform-origin: 50% 50% !important;
 }
 
+/* Compositor-only cover used while the native window changes fullscreen state. */
+#pake-fullscreen-fade {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  background: #000000;
+  opacity: 0;
+  pointer-events: none;
+  will-change: opacity;
+  transition: opacity 180ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+#pake-fullscreen-fade.pake-fullscreen-fade-visible {
+  opacity: 1;
+}
+
 #pake-ultrawide-toast {
   position: fixed;
   left: 50%;
   bottom: 88px;
-  z-index: 2147483647;
+  z-index: 2147483646;
   padding: 10px 16px;
   border-radius: 4px;
   color: #ffffff;
@@ -60,4 +76,10 @@ video.html5-main-video.pake-ultrawide-fill {
 #pake-ultrawide-toast.pake-ultrawide-toast-visible {
   opacity: 1;
   translate: -50% 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #pake-fullscreen-fade {
+    transition-duration: 0ms;
+  }
 }

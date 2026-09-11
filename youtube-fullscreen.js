@@ -14,7 +14,11 @@
   var operationPending = false;
   var enteredAt = 0;
   var ultrawideVideo = null;
+  var ultrawideScale = '';
+  var ultrawideUpdateTimer = 0;
   var ultrawideToastTimer = 0;
+  var fullscreenFadeOutTimer = 0;
+  var fullscreenFadeCleanupTimer = 0;
   var ultrawideFillEnabled = false;
 
   try {
@@ -44,11 +48,62 @@
     dispatchEvents(target, 'fullscreenerror', 'webkitfullscreenerror');
   }
 
+  function fullscreenFadeLayer() {
+    var layer = document.getElementById('pake-fullscreen-fade');
+    if (!layer) {
+      layer = document.createElement('div');
+      layer.id = 'pake-fullscreen-fade';
+      layer.setAttribute('aria-hidden', 'true');
+      document.documentElement.appendChild(layer);
+    }
+    return layer;
+  }
+
+  function fadeToBlack() {
+    var layer = fullscreenFadeLayer();
+    clearTimeout(fullscreenFadeOutTimer);
+    clearTimeout(fullscreenFadeCleanupTimer);
+
+    return new Promise(function (resolve) {
+      // Two frames guarantee that the transparent starting state is painted
+      // before the compositor begins the opacity transition.
+      window.requestAnimationFrame(function () {
+        window.requestAnimationFrame(function () {
+          layer.classList.add('pake-fullscreen-fade-visible');
+          setTimeout(resolve, 200);
+        });
+      });
+    });
+  }
+
+  function fadeFromBlack(delay) {
+    var layer = document.getElementById('pake-fullscreen-fade');
+    if (!layer) return;
+
+    clearTimeout(fullscreenFadeOutTimer);
+    fullscreenFadeOutTimer = setTimeout(function () {
+      fullscreenFadeOutTimer = 0;
+      window.requestAnimationFrame(function () {
+        layer.classList.remove('pake-fullscreen-fade-visible');
+        clearTimeout(fullscreenFadeCleanupTimer);
+        fullscreenFadeCleanupTimer = setTimeout(function () {
+          if (
+            layer.parentNode &&
+            !layer.classList.contains('pake-fullscreen-fade-visible')
+          ) {
+            layer.parentNode.removeChild(layer);
+          }
+        }, 260);
+      });
+    }, delay || 0);
+  }
+
   function clearUltrawideFill() {
     if (!ultrawideVideo) return;
     ultrawideVideo.classList.remove('pake-ultrawide-fill');
     ultrawideVideo.style.removeProperty('--pake-ultrawide-scale');
     ultrawideVideo = null;
+    ultrawideScale = '';
   }
 
   function updateUltrawideFill() {
@@ -86,10 +141,26 @@
     if (ultrawideVideo && ultrawideVideo !== video) clearUltrawideFill();
 
     var scale = Math.min(2, targetAspect / sourceAspect);
-    video.style.setProperty('--pake-ultrawide-scale', scale.toFixed(5));
-    video.classList.add('pake-ultrawide-fill');
+    var nextScale = scale.toFixed(5);
+    if (
+      ultrawideVideo !== video ||
+      ultrawideScale !== nextScale ||
+      !video.classList.contains('pake-ultrawide-fill')
+    ) {
+      video.style.setProperty('--pake-ultrawide-scale', nextScale);
+      video.classList.add('pake-ultrawide-fill');
+    }
     ultrawideVideo = video;
+    ultrawideScale = nextScale;
     return 'active';
+  }
+
+  function scheduleUltrawideUpdate(delay) {
+    clearTimeout(ultrawideUpdateTimer);
+    ultrawideUpdateTimer = setTimeout(function () {
+      ultrawideUpdateTimer = 0;
+      window.requestAnimationFrame(updateUltrawideFill);
+    }, delay || 0);
   }
 
   function showUltrawideToast(message) {
@@ -141,9 +212,13 @@
     [50, 350, 700].forEach(function (delay) {
       setTimeout(function () {
         window.dispatchEvent(new Event('resize'));
-        updateUltrawideFill();
       }, delay);
     });
+
+    // Wait until the native window animation and YouTube's resize work finish.
+    // Measuring the player during those steps causes synchronous WebView2
+    // layouts and makes fullscreen transitions visibly stutter.
+    scheduleUltrawideUpdate(800);
   }
 
   function enterFullscreen(element) {
@@ -164,18 +239,25 @@
     operationPending = true;
     var token = ++operationToken;
 
-    return win.setFullscreen(true).then(
+    return fadeToBlack().then(function () {
+      if (token !== operationToken) return;
+      return win.setFullscreen(true);
+    }).then(
       function () {
         if (token !== operationToken) return;
         operationPending = false;
         dispatchChange(element);
         nudgeLayout();
+        // Tauri resolves before the Windows/WebView2 resize is visually done.
+        // Keep the page covered until that native transition has settled.
+        fadeFromBlack(550);
       },
       function (error) {
         if (token === operationToken) {
           operationPending = false;
           fullscreenElement = null;
           dispatchError(element);
+          fadeFromBlack();
         }
         throw error;
       },
@@ -200,18 +282,23 @@
     }
 
     operationPending = true;
-    return win.setFullscreen(false).then(
+    return fadeToBlack().then(function () {
+      if (token !== operationToken) return;
+      return win.setFullscreen(false);
+    }).then(
       function () {
         if (token !== operationToken) return;
         operationPending = false;
         dispatchChange(element);
         nudgeLayout();
+        fadeFromBlack(550);
       },
       function (error) {
         if (token === operationToken) {
           operationPending = false;
           fullscreenElement = element;
           dispatchError(element);
+          fadeFromBlack();
         }
         throw error;
       },
@@ -244,10 +331,26 @@
     true,
   );
 
+  // A new video can reuse the same player element with different dimensions.
+  // Re-evaluate only after its metadata is available instead of polling layout.
+  document.addEventListener(
+    'loadedmetadata',
+    function (event) {
+      if (
+        fullscreenElement &&
+        event.target &&
+        event.target.matches &&
+        event.target.matches('video.html5-main-video')
+      ) {
+        scheduleUltrawideUpdate(50);
+      }
+    },
+    true,
+  );
+
   // Keep page state synchronized if fullscreen is left through native window
   // controls or another operating-system action.
   setInterval(function () {
-    updateUltrawideFill();
     if (!fullscreenElement || operationPending) return;
     if (Date.now() - enteredAt < 1500) return;
 
