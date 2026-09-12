@@ -289,15 +289,15 @@
   // If skipNative is true, Windows has already left native fullscreen and
   // only the page's Fullscreen API state needs to be synchronized.
   function exitFullscreen(skipNative) {
-    if (!fullscreenElement) return Promise.resolve();
+    if (!fullscreenElement || operationPending) return Promise.resolve();
 
     var element = fullscreenElement;
-    fullscreenElement = null;
-    clearUltrawideFill();
     var token = ++operationToken;
     var win = appWindow();
 
     if (skipNative || !win) {
+      fullscreenElement = null;
+      clearUltrawideFill();
       dispatchChange(element);
       nudgeLayout();
       return Promise.resolve();
@@ -306,6 +306,10 @@
     operationPending = true;
     return fadeToBlack().then(function () {
       if (token !== operationToken) return;
+      // Keep the ultrawide frame visible until the cover is fully opaque.
+      // Clearing it here prevents a 16:9 frame from flashing before exit.
+      fullscreenElement = null;
+      clearUltrawideFill();
       return win.setFullscreen(false);
     }).then(
       function () {
@@ -320,7 +324,7 @@
           operationPending = false;
           fullscreenElement = element;
           dispatchError(element);
-          fadeFromBlack();
+          fadeFromBlack(0, updateUltrawideFill);
         }
         throw error;
       },
@@ -337,6 +341,7 @@
         exitFullscreen();
       } else if (
         fullscreenElement &&
+        !operationPending &&
         !event.repeat &&
         !event.shiftKey &&
         !event.ctrlKey &&
