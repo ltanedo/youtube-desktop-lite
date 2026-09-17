@@ -2,13 +2,13 @@
 
 A lightweight, native-feeling desktop client for YouTube built using **Rust**, **Tauri**, and **Pake**. 
 
-Unlike bulky Electron-based wrappers, this application uses the operating system's native Webview, yielding a tiny application size (~8 MB) and extremely low memory footprint.
+This application uses Windows WebView2 rather than bundling a browser runtime. Memory use depends on YouTube and the videos being played.
 
 ---
 
 ## Key Features
 
-- **Ultra Lightweight:** Standalone executable size is only ~8.3 MB.
+- **Integrated ad blocker (0.1.15):** Enabled-by-default `adblock-rust` network filtering, early scriptlets and cosmetic rules. Use **Shield** or **Ctrl+Alt+B** for the persistent toggle, diagnostics and filter updates. See [coverage and testing notes](native/README.md).
 - **Native Look & Feel:** Standard OS window borders are hidden/styled to integrate smoothly with the player window.
 - **Custom Dark Title Bar (Fix Applied):** Features a customized dark window frame to match YouTube's dark mode, preventing the default glaring white Windows title bar.
 - **Custom Style Injection:** Integrates a custom CSS style injector to style elements (such as making the top bar solid black and adjusting search input visibility).
@@ -25,9 +25,9 @@ Unlike bulky Electron-based wrappers, this application uses the operating system
 
 Before building this application from source on Windows, ensure you have the following installed:
 
-1. **Node.js** ($\ge$ 18.0.0, $\ge$ 22.0 recommended)
+1. **Node.js** (22 or newer recommended)
    - Check with: `node -v`
-2. **Rust Toolchain** ($\ge$ 1.85.0)
+2. **Rust Toolchain** (1.95 tested with the pinned blocker dependencies)
    - Install via [rustup.rs](https://rustup.rs/)
    - Check with: `rustc --version`
 3. **Visual Studio C++ Build Tools**
@@ -37,7 +37,7 @@ Before building this application from source on Windows, ensure you have the fol
 
 ## Windows Dark Title Bar Fix
 
-By default, Pake's internal Rust window manager hardcodes a standard OS-theme window border (`.theme(None)`), which renders as a white title bar on Windows even when running the app in dark mode or with the `--dark-mode` flag.
+Older Pake builds hardcoded a standard OS-theme window border (`.theme(None)`). The pinned Pake 3.15.7 already includes the dark-mode-aware behavior below; no additional theme patch is needed.
 
 This repository notes a custom patch applied to Pake's internal file (`src-tauri/src/app/window.rs` in the `pake-cli` node package):
 
@@ -75,24 +75,26 @@ While a 16:9 video is fullscreen on an ultrawide monitor, press **D** to toggle 
 
 ## How to Build
 
-1. **Install Pake CLI:**
-   ```bash
-   npm install -g pake-cli
-   ```
+Clone this repository and run from its root on Windows:
 
-2. **Generate the App:**
-   Clone this repository, navigate to the folder, and run:
-   ```bash
-npx pake-cli@3.15.7 https://www.youtube.com --name "YouTube" --identifier "com.pake.a1c202c" --inject youtube-custom.css,youtube-reflow.js,youtube-fullscreen.js --width 1280 --height 800 --min-width 720 --min-height 480 --maximize --dark-mode --app-version 0.1.14 --keep-binary
-   ```
+```powershell
+npm ci --ignore-scripts
+npm run build
+$env:CARGO_TARGET_DIR = Join-Path (Get-Location) '.build-target'
+npm test
+```
 
-3. **Output:**
-   Pake will output:
-   - `YouTube.msi` (The Windows Installer)
-   - The compiled standalone executable `YouTube.exe` is stored in Pake's build directory and can be copied over for direct use.
+This installs project-local Pake **3.15.7**, applies the preserved startup patch
+and the native blocker integration, restores the Rust dependency lockfile, and
+builds `YouTube.exe` plus `YouTube.msi`. Do not build with an unpatched global or
+cached Pake CLI: the three JavaScript/CSS injections alone do not include the
+native blocker. See [native/README.md](native/README.md) for architecture,
+filter provenance, limitations, recovery and the manual acceptance checklist.
 
 ---
 
 ## License
 
-This project is open-sourced under the MIT License.
+The original wrapper customizations are MIT-licensed. Pake, the Rust blocker,
+filter lists and scriptlet resources retain their own licenses; see
+[third-party notices](native/THIRD-PARTY-NOTICES.md).

@@ -1,0 +1,14 @@
+{
+  "name": "youtube-desktop-lite",
+  "version": "0.1.15",
+  "private": true,
+  "scripts": {
+    "prepare:runtime": "node scripts/prepare.cjs",
+    "build": "node scripts/build.cjs",
+    "test": "cargo test --locked --manifest-path native/core/Cargo.toml && node scripts/test-scriptlets.cjs"
+  },
+  "devDependencies": {
+    "pake-cli": "3.15.7",
+    "playwright-core": "1.63.0"
+  }
+}

@@ -1,3 +1,7 @@
 # Ignore compiled binaries/installers in git repo
 YouTube.exe
 YouTube.msi
+node_modules/
+.build-target/
+.test-output/
+*.log
