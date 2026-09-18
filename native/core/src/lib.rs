@@ -5,6 +5,7 @@ use sha2::{Digest, Sha256};
 use std::{collections::HashSet, fs, io::Write, path::Path};
 
 pub const ENGINE_VERSION: &str = "adblock-rust 0.13.3";
+const LOCAL_RULES: &str = include_str!("youtube-late-ads.txt");
 pub const RESOURCE_URL: &str = "https://raw.githubusercontent.com/brave/adblock-rust/master/data/brave/brave-resources.json";
 pub const LIST_URLS: &[(&str, &str)] = &[
     ("easylist", "https://easylist.to/easylist/easylist.txt"),
@@ -93,6 +94,14 @@ impl Blocker {
             let options = ParseOptions { permissions: if list.name.starts_with("ublock") { PermissionMask::from_bits(1) } else { PermissionMask::default() }, ..Default::default() };
             set.add_filter_list(text, options);
         }
+        // Apply app compatibility rules to cached bundles too; updating remote lists
+        // must not remove a native-app fix or require clearing a user's profile.
+        set.add_filter_list(LOCAL_RULES.to_owned(), Default::default());
+        for name in ["json-prune-fetch-response.js", "json-prune-xhr-response.js"] {
+            if !bundle.resources.iter().any(|resource| resource.name == name) {
+                return Err(format!("Missing required late-response scriptlet: {name}"));
+            }
+        }
         for resource in &bundle.resources {
             if resource.content.len() > 4_000_000 || STANDARD.decode(&resource.content).is_err() {
                 return Err("Invalid resource encoding/size".into());
@@ -102,8 +111,11 @@ impl Blocker {
         engine.use_resources(bundle.resources.clone());
         let doc = engine.url_cosmetic_resources("https://www.youtube.com/");
         if doc.injected_script.len() < 100 { return Err("Missing YouTube scriptlet resources".into()); }
-        let fingerprint = format!("{:x}", Sha256::digest(serde_json::to_vec(bundle).map_err(|e|e.to_string())?));
-        Ok(Self { engine, version: bundle.version.clone(), fingerprint })
+        let mut digest = Sha256::new();
+        digest.update(serde_json::to_vec(bundle).map_err(|e|e.to_string())?);
+        digest.update(LOCAL_RULES.as_bytes());
+        let fingerprint = format!("{:x}", digest.finalize());
+        Ok(Self { engine, version: format!("{}+pake-late-ads-1",bundle.version), fingerprint })
     }
     pub fn decide(&self, url: &str, source: &str, kind: &str) -> Decision {
         self.decide_method(url, source, kind, "GET")
@@ -196,15 +208,21 @@ mod tests {
     #[test] fn real_baseline_and_cached_recovery() {
         let b=Blocker::from_bundle(&baseline()).unwrap();
         assert!(b.document_script().contains("ytInitialPlayerResponse"));
+        assert!(b.document_script().contains("get_watch"));
+        assert!(b.version.ends_with("+pake-late-ads-1"));
         let dir=tempfile::tempdir().unwrap(); let file=dir.path().join("bundle.json");
         atomic_save(&file,b"broken").unwrap();
         assert!(!load_cached_or_baseline(&file).unwrap().1);
         let bytes=serde_json::to_vec(&baseline()).unwrap();
         atomic_save(&file,&bytes).unwrap();
         assert!(load_cached_or_baseline(&file).unwrap().1);
+        assert!(load_cached_or_baseline(&file).unwrap().0.version.ends_with("+pake-late-ads-1"));
         let before=fs::read(&file).unwrap();
         let mut invalid=baseline(); invalid.resources.clear();
         assert!(Blocker::from_bundle(&invalid).is_err());
         assert_eq!(fs::read(&file).unwrap(),before);
+        let mut missing_scriptlet=baseline();
+        missing_scriptlet.resources.retain(|r|r.name!="json-prune-fetch-response.js");
+        assert!(Blocker::from_bundle(&missing_scriptlet).is_err());
     }
 }

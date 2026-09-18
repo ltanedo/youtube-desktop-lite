@@ -1,4 +1,22 @@
-# Windows ad blocker (test build 0.1.15)
+# Windows ad blocker (0.1.16)
+
+## Late-ad response fix (0.1.16)
+
+`core/src/youtube-late-ads.txt` supplements the upstream lists with narrowly
+scoped fetch/XHR scriptlets for `youtubei/v1/player`, `next`, `get_watch`, and
+`player/ad_break`, with or without query strings. They remove only `playerAds`,
+`adPlacements`, and `adSlots` at supported response/wrapper paths; they do not
+seek/skip videos or remove media, captions, end screens or recommendations.
+The app applies these rules after every bundle load, including an existing
+cached bundle. The diagnostic filter version ends in `+pake-late-ads-1`, and
+the bundle fingerprint also includes the local rules.
+
+Regression fixtures reproduced ad fields passing through late responses in
+0.1.15. The new matrix covers fetch strings, Request objects, XHR text/JSON,
+object/array responses, same-document navigation, the disabled mode, unrelated
+endpoints and non-JSON failures. The user confirmed that post-roll ads no longer
+appeared in their test of this build. This is not a guarantee against every
+server-side ad variant or future YouTube changes.
 
 `core/` is a reusable Rust library with no Tauri/WebView2 dependency, using
 `adblock = 0.13.3` with the thread-safe engine configuration. `pake_adblock.rs`
