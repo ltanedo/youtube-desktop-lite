@@ -41,6 +41,44 @@ video.html5-main-video.pake-ultrawide-fill {
   transform-origin: 50% 50% !important;
 }
 
+/*
+ * WKWebView does not apply browser :fullscreen layout for the synthetic
+ * Fullscreen API used by the native-window shim. Keep the complete YouTube
+ * player together and cover the native viewport; controls and captions remain
+ * children of #movie_player and are therefore preserved.
+ */
+html.pake-youtube-player-fullscreen,
+html.pake-youtube-player-fullscreen body {
+  overflow: hidden !important;
+  background: #000000 !important;
+}
+
+html.pake-youtube-player-fullscreen #movie_player.pake-native-fullscreen-player {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  min-width: 100vw !important;
+  min-height: 100vh !important;
+  max-width: none !important;
+  max-height: none !important;
+  z-index: 2147483645 !important;
+  background: #000000 !important;
+}
+
+/* The page's masthead/details/recommendations can live in higher ancestor
+ * stacking contexts than #movie_player. Hide those layers while the pinned
+ * player is active; player controls and caption overlays remain untouched. */
+html.pake-youtube-player-fullscreen #masthead-container,
+html.pake-youtube-player-fullscreen ytd-masthead,
+html.pake-youtube-player-fullscreen ytd-watch-flexy #secondary,
+html.pake-youtube-player-fullscreen ytd-watch-flexy #below,
+html.pake-youtube-player-fullscreen ytd-watch-flexy #chat-container,
+html.pake-youtube-player-fullscreen ytd-watch-flexy #panels-full-bleed-container {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
 /* Compositor-only cover used while the native window changes fullscreen state. */
 #pake-fullscreen-fade {
   position: fixed;

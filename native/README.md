@@ -1,4 +1,11 @@
-# Windows ad blocker (0.1.16)
+# Native ad blocker (0.2.0)
+
+The shared `core/` blocker is integrated with WebView2 on Windows and WKWebView
+on macOS. Both platforms install the same document-start scriptlets, response
+pruning and cosmetic rules before the first YouTube navigation. Windows also
+intercepts individual network requests with the Rust engine. macOS uses a
+narrow `WKContentRuleList` for known ad hosts and endpoints; it deliberately
+does not block `googlevideo.com` media or `youtubei` player responses.
 
 ## Late-ad response fix (0.1.16)
 
@@ -18,25 +25,29 @@ endpoints and non-JSON failures. The user confirmed that post-roll ads no longer
 appeared in their test of this build. This is not a guarantee against every
 server-side ad variant or future YouTube changes.
 
-`core/` is a reusable Rust library with no Tauri/WebView2 dependency, using
-`adblock = 0.13.3` with the thread-safe engine configuration. `pake_adblock.rs`
-is the Windows adapter; `ui.js` provides the Shield panel and Ctrl+Alt+B shortcut.
+`core/` is a reusable Rust library with no Tauri/WebView2 or WKWebView
+dependency, using `adblock = 0.13.3` with the thread-safe engine configuration.
+`pake_adblock.rs` is the Windows adapter, `pake_adblock_macos.rs` is the macOS
+adapter, and `ui.js` provides the Shield panel and Ctrl+Alt+B / Command+Option+B
+shortcut.
 
-The app starts on about:blank, registers WebResourceRequested interception and
-document-created scripts, then navigates to YouTube after script registration.
+The app starts on about:blank, registers platform interception and
+document-created scripts, then navigates to YouTube after registration.
 Filtering is enabled by default. Changing it persists a native setting, replaces
 the document-created script, and reloads the page. Browser profiles are not cleared.
 Profile identity stays **YouTube / com.pake.a1c202c**. Cookies and ultrawide settings
-remain in the existing `%APPDATA%/YouTube` profile. Blocker files are in its
-`pake-adblock` subdirectory. Login is still subject to Google's session expiry.
+remain in the existing platform app-data profile. Blocker files are in its
+`pake-adblock` subdirectory (`%APPDATA%/YouTube` on Windows). Login is still
+subject to Google's session expiry.
 
 ## Scope and limitations
 
-- Requests originating from HTTPS youtube.com, www/m/music.youtube.com and
-  youtube-nocookie.com/www.youtube-nocookie.com are checked; other origins and
-  document navigations are allowed, including Google sign-in documents.
-- Network type/method, Referer (or top document URL fallback), exceptions and
-  base64 resource redirects are supported. Blocked requests receive 403.
+- Shared document-start filtering is restricted to HTTPS youtube.com,
+  www/m/music.youtube.com and youtube-nocookie.com/www.youtube-nocookie.com;
+  other origins and document navigations are allowed, including Google sign-in
+  documents.
+- On Windows, network type/method, Referer (or top document URL fallback),
+  exceptions and base64 resource redirects are supported. Blocked requests receive 403.
   Newer WebView2 APIs include worker/frame sources; older runtimes use the legacy
   filter. Referrer-less nested-frame attribution is approximate. WebView2 may not
   expose cached/service-worker responses in the same way as ordinary requests.
@@ -49,7 +60,9 @@ remain in the existing `%APPDATA%/YouTube` profile. Blocker files are in its
 - A maintained rule may be unsupported by adblock-rust or need a newer resource.
   Server-stitched ads are not guaranteed to be removed. Never infer success just
   from a session where no ad was served.
-- Linux/macOS are not supported by this adapter. No Skip-button clicking loop.
+- Linux is not supported. macOS does not expose per-rule match counters through
+  WKContentRuleList, so the Shield panel labels those counters unavailable.
+  There is no Skip-button clicking loop on either platform.
 - Stats contain counts, bundle fingerprint, runtime/version and a hashed rule ID;
   no request URLs, cookies, authorization headers or browsing history are logged.
 
@@ -75,15 +88,19 @@ fail validation.
 
 ## Build and test
 
-From the project root on Windows with Node 22+, Rust 1.95 (tested), Visual Studio
-C++ build tools and WebView2:
+From the project root with Node 22+ and Rust 1.95 or newer, use Visual Studio C++
+build tools and WebView2 on Windows, or Xcode Command Line Tools on macOS:
 
-```powershell
+```sh
 npm ci --ignore-scripts
 npm run build
-$env:CARGO_TARGET_DIR = Join-Path (Get-Location) '.build-target'
 npm test
 ```
+
+The build produces `YouTube.exe`/`YouTube.msi` on Windows or an Apple-silicon
+`YouTube.app`/`YouTube.dmg` on Apple-silicon macOS. Local macOS builds are ad-hoc
+signed; public distribution still requires a Developer ID signature and Apple
+notarization.
 
 `scripts/prepare.cjs` checks Pake 3.15.7, applies the existing native background/
 startup patch and explicit anchor-checked blocker edits, copies the checked-in
@@ -100,12 +117,12 @@ embedded in the Rust executable. No forced major-version dependency upgrade was
 applied as part of this player change; review them before future build-tool work.
 
 Core tests cover block/allow/exception/redirect, origin scoping, conditional
-filters, valid cache and corrupt-cache recovery. The Edge headless fixture serves
+filters, valid cache and corrupt-cache recovery. The Edge/Chrome headless fixture serves
 all content locally and checks document-start property traps, JSON pruning, CSS,
 normal content and enabled/disabled behavior, including a restrictive Trusted
 Types CSP like YouTube's (the settings UI uses no innerHTML). It uses a fresh isolated browser
 context and never accesses the user's YouTube profile. These tests do not prove
-live pre-roll/mid-roll removal or WebView2's live request interception.
+live pre-roll/mid-roll removal or the native runtime's live request interception.
 
 Before publishing, manually verify signed-in/out videos, ads when served,
 playlists/autoplay, seeking, live streams, captions, video navigation, restart
