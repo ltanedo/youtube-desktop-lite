@@ -22,7 +22,9 @@
     if (document.getElementById('pake-blocker-controls')) return;
     const host = document.createElement('div');
     host.id = 'pake-blocker-controls';
-    host.style.cssText = 'position:fixed;right:18px;bottom:18px;z-index:2147483645;font:13px system-ui;';
+    // Isolate the fixed control in its own small compositing layer. Without
+    // this, WKWebView may repaint it with the full YouTube page while scrolling.
+    host.style.cssText = 'position:fixed;right:18px;bottom:18px;z-index:2147483645;font:13px system-ui;contain:layout style;isolation:isolate;transform:translate3d(0,0,0);';
     const root = host.attachShadow({ mode: 'closed' });
     // YouTube enforces Trusted Types: never use innerHTML/HTML parsing here.
     const style = document.createElement('style');
