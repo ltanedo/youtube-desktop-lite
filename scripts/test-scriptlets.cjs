@@ -10,6 +10,7 @@ const script = execFileSync('cargo', ['run','--quiet','--locked','--manifest-pat
   env:{...process.env,CARGO_TARGET_DIR:path.join(root,'.build-target')}
 });
 const ui = fs.readFileSync(path.join(root,'native/ui.js'),'utf8');
+const smoothScroll = fs.readFileSync(path.join(root,'youtube-scroll.js'),'utf8');
 const playerResponse = {
  playerAds:[{kind:'postroll'}],adPlacements:[{kind:'postroll'}],adSlots:[{kind:'postroll'}],
  videoDetails:{videoId:'fixture'},streamingData:{adaptiveFormats:[{url:'https://media.test/content'}]},
@@ -49,7 +50,7 @@ function browserLaunchOptions() {
     }
     return route.fulfill({status:200,contentType:'text/html',headers:{'Content-Security-Policy':"require-trusted-types-for 'script'; trusted-types none"},body:fixture});
    });
-   await context.addInitScript({content:`localStorage.setItem('pake-adblock-enabled','${enabled?'1':'0'}');\n${script}\n${ui}`});
+   await context.addInitScript({content:`localStorage.setItem('pake-adblock-enabled','${enabled?'1':'0'}');\n${script}\n${ui}\n${smoothScroll}`});
    const page = await context.newPage();
    const errors=[];page.on('pageerror',e=>errors.push(e.message));
    await page.goto('https://www.youtube.com/watch?v=fixture');
@@ -62,6 +63,27 @@ function browserLaunchOptions() {
    } else { assert.equal(result.early.ads.length,1);assert.equal(result.jsonEntries,2);assert.notEqual(result.adDisplay,'none'); }
    assert.deepEqual(errors,[]);
    console.log(`PASS: ${enabled?'enabled':'disabled'} early page script, JSON response, cosmetics, normal content, controls UI`);
+   if (enabled && process.platform === 'darwin') {
+    const scrolling=await page.evaluate(async()=>{
+     document.body.style.minHeight='5000px';
+     window.scrollTo(0,0);
+     const stepped=new WheelEvent('wheel',{deltaY:100,deltaMode:WheelEvent.DOM_DELTA_PIXEL,cancelable:true});
+     Object.defineProperty(stepped,'wheelDeltaY',{value:-120});
+     const steppedAllowed=window.dispatchEvent(stepped);
+     await new Promise(resolve=>setTimeout(resolve,320));
+     const afterStepped=window.scrollY;
+     window.scrollTo(0,0);
+     const precise=new WheelEvent('wheel',{deltaY:4,deltaMode:WheelEvent.DOM_DELTA_PIXEL,cancelable:true});
+     Object.defineProperty(precise,'wheelDeltaY',{value:-4});
+     const preciseAllowed=window.dispatchEvent(precise);
+     return {installed:window.__pakeMacSmoothScroll===true,steppedAllowed,afterStepped,preciseAllowed};
+    });
+    assert.equal(scrolling.installed,true);
+    assert.equal(scrolling.steppedAllowed,false);
+    assert.ok(scrolling.afterStepped>80);
+    assert.equal(scrolling.preciseAllowed,false);
+    console.log('PASS: macOS wheel and trackpad-like input share continuous momentum');
+   }
    // Responses arriving after initial playback / same-document video navigation.
    for (const phase of ['initial-video','next-video']) {
     if (phase==='next-video') await page.evaluate(()=>history.pushState({},'', '/watch?v=next-video'));

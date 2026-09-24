@@ -22,6 +22,8 @@ YouTube and the videos being played.
 - **Custom Style Injection:** Integrates a custom CSS style injector to style elements (such as making the top bar solid black and adjusting search input visibility).
 - **High-DPI Zoom Reflow:** Recalculates the player after Control-key or
   Command-key zoom changes.
+- **Smooth macOS Scrolling:** Coalesces trackpad, touch-strip and stepped-wheel
+  input into a continuous momentum curve without changing horizontal gestures.
 - **Native-Like Fullscreen:** Injects `youtube-fullscreen.js` so Pake enters
   native window fullscreen without moving YouTube's video away from its
   controls and captions. YouTube's fullscreen button, **F**, and **Escape**
