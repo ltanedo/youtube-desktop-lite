@@ -58,6 +58,11 @@ pub fn blocker_status(window: WebviewWindow, state: tauri::State<State>) -> Resu
     authorize(&window)?; Ok(state.0.lock().map_err(|_|"Blocker unavailable")?.status())
 }
 #[tauri::command]
+pub fn blocker_focus_webview(window: WebviewWindow) -> Result<(), String> {
+    authorize(&window)?;
+    window.set_focus().map_err(|error| error.to_string())
+}
+#[tauri::command]
 pub async fn blocker_set_enabled(window: WebviewWindow, state: tauri::State<'_,State>, enabled: bool) -> Result<Status,String> {
     authorize(&window)?;
     let state=state.inner().clone();

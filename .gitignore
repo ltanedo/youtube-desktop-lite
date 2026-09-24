@@ -1,7 +1,11 @@
 # Ignore compiled binaries/installers in git repo
 YouTube.exe
 YouTube.msi
+YouTube.app/
+YouTube.dmg
+YouTube-binary
 node_modules/
 .build-target/
 .test-output/
+native/core/target/
 *.log

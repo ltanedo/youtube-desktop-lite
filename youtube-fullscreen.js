@@ -72,7 +72,7 @@
           layer.classList.add('pake-fullscreen-fade-visible');
           setTimeout(function () {
             // Once the page is fully covered, hide its scrollbars before the
-            // native viewport changes size. This prevents WebView2 from
+            // native viewport changes size. This prevents the WebView from
             // briefly painting a stale vertical scrollbar during the resize.
             document.documentElement.classList.add(
               'pake-fullscreen-transition',
@@ -94,7 +94,7 @@
       window.requestAnimationFrame(function () {
         if (prepareReveal) prepareReveal();
 
-        // Give WebView2 one fully covered compositor frame to paint the final
+        // Give the WebView one fully covered compositor frame to paint the final
         // ultrawide transform before any part of the video becomes visible.
         window.requestAnimationFrame(function () {
           // Restore the settled page behind the still-opaque cover, then reveal
@@ -126,6 +126,21 @@
     ultrawideVideo.style.removeProperty('--pake-ultrawide-scale');
     ultrawideVideo = null;
     ultrawideScale = '';
+  }
+
+  // A synthetic Fullscreen API state is enough for WebView2, but current
+  // WKWebView does not apply the browser's :fullscreen layout to YouTube's
+  // player. Pin the complete player (video, captions and controls together) to
+  // the native viewport so macOS fullscreen does not merely enlarge the page.
+  function setPlayerFullscreenLayout(active) {
+    document.documentElement.classList.toggle(
+      'pake-youtube-player-fullscreen',
+      active,
+    );
+    var player = document.getElementById('movie_player');
+    if (player) {
+      player.classList.toggle('pake-native-fullscreen-player', active);
+    }
   }
 
   function updateUltrawideFill() {
@@ -238,15 +253,51 @@
     });
 
     // Wait until the native window animation and YouTube's resize work finish.
-    // Measuring the player during those steps causes synchronous WebView2
+    // Measuring the player during those steps causes synchronous WebView
     // layouts and makes fullscreen transitions visibly stutter.
     scheduleUltrawideUpdate(800);
+  }
+
+  function restoreKeyboardFocus(win) {
+    // macOS can return from its fullscreen Space with the native window active
+    // but WKWebView no longer acting as the keyboard responder. Reassert both
+    // levels after the transition so player shortcuts work without a click.
+    [50, 350, 800].forEach(function (delay) {
+      setTimeout(function () {
+        var invoke = window.__TAURI__ && window.__TAURI__.core
+          ? window.__TAURI__.core.invoke
+          : null;
+        if (invoke) {
+          invoke('blocker_focus_webview').catch(function () {});
+        } else if (win && typeof win.setFocus === 'function') {
+          win.setFocus().catch(function () {});
+        }
+        window.focus();
+        var player = document.getElementById('movie_player');
+        if (player && typeof player.focus === 'function') {
+          try {
+            player.focus({ preventScroll: true });
+          } catch (error) {
+            player.focus();
+          }
+        }
+      }, delay);
+    });
   }
 
   function enterFullscreen(element) {
     var win = appWindow();
     if (!win) {
       return Promise.reject(new TypeError('Tauri window API unavailable'));
+    }
+
+    // YouTube's WKWebView player can keep labelling its control "Full screen"
+    // even after the synthetic fullscreenchange event. Treat a repeated
+    // request from the same element as the user's exit toggle so the on-screen
+    // control remains reliable on macOS. A request from a different element
+    // still follows the browser behavior of switching the fullscreen owner.
+    if (fullscreenElement === element) {
+      return exitFullscreen();
     }
 
     if (fullscreenElement) {
@@ -259,6 +310,7 @@
     fullscreenElement = element;
     enteredAt = Date.now();
     operationPending = true;
+    setPlayerFullscreenLayout(true);
     var token = ++operationToken;
 
     return fadeToBlack().then(function () {
@@ -270,7 +322,7 @@
         operationPending = false;
         dispatchChange(element);
         nudgeLayout();
-        // Tauri resolves before the Windows/WebView2 resize is visually done.
+        // Tauri resolves before the native WebView resize is visually done.
         // Keep the page covered until that native transition has settled.
         fadeFromBlack(550, updateUltrawideFill);
       },
@@ -278,6 +330,7 @@
         if (token === operationToken) {
           operationPending = false;
           fullscreenElement = null;
+          setPlayerFullscreenLayout(false);
           dispatchError(element);
           fadeFromBlack();
         }
@@ -286,7 +339,7 @@
     );
   }
 
-  // If skipNative is true, Windows has already left native fullscreen and
+  // If skipNative is true, the OS has already left native fullscreen and
   // only the page's Fullscreen API state needs to be synchronized.
   function exitFullscreen(skipNative) {
     if (!fullscreenElement || operationPending) return Promise.resolve();
@@ -297,9 +350,11 @@
 
     if (skipNative || !win) {
       fullscreenElement = null;
+      setPlayerFullscreenLayout(false);
       clearUltrawideFill();
       dispatchChange(element);
       nudgeLayout();
+      restoreKeyboardFocus(win);
       return Promise.resolve();
     }
 
@@ -309,6 +364,7 @@
       // Keep the ultrawide frame visible until the cover is fully opaque.
       // Clearing it here prevents a 16:9 frame from flashing before exit.
       fullscreenElement = null;
+      setPlayerFullscreenLayout(false);
       clearUltrawideFill();
       return win.setFullscreen(false);
     }).then(
@@ -317,12 +373,14 @@
         operationPending = false;
         dispatchChange(element);
         nudgeLayout();
+        restoreKeyboardFocus(win);
         fadeFromBlack(550);
       },
       function (error) {
         if (token === operationToken) {
           operationPending = false;
           fullscreenElement = element;
+          setPlayerFullscreenLayout(true);
           dispatchError(element);
           fadeFromBlack(0, updateUltrawideFill);
         }
@@ -340,6 +398,26 @@
         event.stopImmediatePropagation();
         exitFullscreen();
       } else if (
+        !operationPending &&
+        !event.repeat &&
+        !event.shiftKey &&
+        !event.ctrlKey &&
+        !event.altKey &&
+        !event.metaKey &&
+        !isEditableTarget(event.target) &&
+        event.key.toLowerCase() === 'f'
+      ) {
+        // WKWebView does not always update YouTube's internal fullscreen flag,
+        // so its own F shortcut can become a no-op. Own the toggle here and
+        // stop YouTube from issuing a second, conflicting request.
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        if (fullscreenElement) {
+          exitFullscreen();
+        } else {
+          enterFullscreen(document.documentElement);
+        }
+      } else if (
         fullscreenElement &&
         !operationPending &&
         !event.repeat &&
@@ -353,6 +431,29 @@
         event.preventDefault();
         event.stopImmediatePropagation();
         toggleUltrawideFill();
+      }
+    },
+    true,
+  );
+
+  // YouTube also handles its player shortcuts on keyup. After our keydown
+  // enters fullscreen, that delayed handler otherwise sees the stale macOS
+  // state and immediately asks to enter again—which our toggle correctly
+  // interprets as an exit. Consume the matching keyup as part of the same
+  // shortcut transaction.
+  window.addEventListener(
+    'keyup',
+    function (event) {
+      if (
+        !event.shiftKey &&
+        !event.ctrlKey &&
+        !event.altKey &&
+        !event.metaKey &&
+        !isEditableTarget(event.target) &&
+        event.key.toLowerCase() === 'f'
+      ) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
       }
     },
     true,

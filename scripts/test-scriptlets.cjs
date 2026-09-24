@@ -22,8 +22,21 @@ const fixture = `<!doctype html><html><head><script>
   window.beforeSiteFinished = {ads:ytInitialPlayerResponse.playerAds,placements:ytInitialPlayerResponse.adPlacements,slots:ytInitialPlayerResponse.adSlots,video:ytInitialPlayerResponse.videoDetails.videoId};
   window.parsed = JSON.parse('{"entries":[{"command":{"reelWatchEndpoint":{"adClientParams":{"isAd":true}}}},{"videoId":"fixture"}],"videoDetails":{"videoId":"fixture"}}');
   </script></head><body><div id="contents"><ytd-rich-item-renderer id="ad"><ytd-ad-slot-renderer>advertisement fixture</ytd-ad-slot-renderer></ytd-rich-item-renderer></div><div id="content">Normal content</div></body></html>`;
+function browserLaunchOptions() {
+ if (process.platform === 'win32') return {channel:'msedge',headless:true};
+ if (process.platform === 'darwin') {
+  const candidates = [
+   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+   '/Applications/.Google Chrome Engine.app/Contents/MacOS/Google Chrome',
+   '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser'
+  ];
+  const executablePath = candidates.find(candidate => fs.existsSync(candidate));
+  if (executablePath) return {executablePath,headless:true};
+ }
+ return {headless:true};
+}
 (async()=>{
- const browser = await chromium.launch({channel:'msedge',headless:true});
+ const browser = await chromium.launch(browserLaunchOptions());
  try {
   for (const enabled of [true,false]) {
    const context = await browser.newContext();

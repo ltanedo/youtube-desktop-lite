@@ -25,7 +25,7 @@
   window.addEventListener(
     "keydown",
     (event) => {
-      if (event.ctrlKey && !event.altKey && ZOOM_KEYS.has(event.key)) {
+      if ((event.ctrlKey || event.metaKey) && !event.altKey && ZOOM_KEYS.has(event.key)) {
         scheduleYouTubeReflow();
       }
     },
@@ -35,14 +35,14 @@
   window.addEventListener(
     "wheel",
     (event) => {
-      if (event.ctrlKey) {
+      if (event.ctrlKey || event.metaKey) {
         scheduleYouTubeReflow();
       }
     },
     { capture: true, passive: true }
   );
 
-  // Also cover restored zoom values and WebView2-driven viewport changes.
+  // Also cover restored zoom values and native WebView viewport changes.
   window.addEventListener("DOMContentLoaded", scheduleYouTubeReflow, {
     once: true
   });
