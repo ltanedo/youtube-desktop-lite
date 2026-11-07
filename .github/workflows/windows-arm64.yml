@@ -15,7 +15,6 @@ jobs:
     timeout-minutes: 120
     env:
       PAKE_TARGET_ARCH: arm64
-      CI: "1"
     steps:
       # Keep LF endings so the native patch applies to npm-installed Pake sources.
       - name: Disable CRLF conversion
