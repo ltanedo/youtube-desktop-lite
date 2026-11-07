@@ -70,6 +70,17 @@ jobs:
           npm test
           if ($LASTEXITCODE -ne 0) { throw 'tests failed' }
 
+      # Windows PowerShell 5.1: PowerShell 7 rejects the WindowsInstaller COM call with DISP_E_TYPEMISMATCH.
+      - name: Verify MSI platform is Arm64
+        shell: powershell
+        run: |
+          $installer = New-Object -ComObject WindowsInstaller.Installer
+          $db = $installer.GetType().InvokeMember('OpenDatabase','InvokeMethod',$null,$installer,@((Resolve-Path 'YouTube.msi').Path,0))
+          $si = $db.GetType().InvokeMember('SummaryInformation','GetProperty',$null,$db,@(0))
+          $template = $si.GetType().InvokeMember('Property','GetProperty',$null,$si,@(7))
+          "YouTube.msi template: $template"
+          if ($template -notmatch '^Arm64;') { throw "MSI template is not Arm64: $template" }
+
       - name: Verify architecture, config and package
         shell: pwsh
         run: |
@@ -94,14 +105,6 @@ jobs:
           $machine = Get-PEMachine 'YouTube.exe'
           '{0}: PE machine 0x{1:X4}' -f 'YouTube.exe', $machine
           if ($machine -ne 0xAA64) { throw "YouTube.exe is not ARM64 (machine 0x$($machine.ToString('X4')))" }
-          $summary = (Get-Item 'YouTube.msi' | Select-Object -ExpandProperty FullName)
-          $installer = New-Object -ComObject WindowsInstaller.Installer
-          $db = $installer.GetType().InvokeMember('OpenDatabase','InvokeMethod',$null,$installer,@($summary,0))
-          $si = $db.GetType().InvokeMember('SummaryInformation','GetProperty',$null,$db,@(0))
-          $template = $si.GetType().InvokeMember('Property','GetProperty',$null,$si,@(7))
-          "YouTube.msi template: $template"
-          if ($template -notmatch '^Arm64;') { throw "MSI template is not Arm64: $template" }
-
           New-Item -ItemType Directory -Force dist | Out-Null
           Copy-Item YouTube.exe "dist/YouTube-Lite-$version-Windows-ARM64.exe"
           Copy-Item YouTube.msi "dist/YouTube-Lite-$version-Windows-ARM64.msi"
