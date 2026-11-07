@@ -52,4 +52,14 @@ fs.copyFileSync('native/ui.js', path.join(runtime, 'pake-adblock/ui.js'));
 fs.cpSync('native/core', path.join(runtime, 'pake-adblock/core'), {recursive:true, filter: p => !p.split(path.sep).includes('target')});
 if (fs.existsSync('native/runtime-Cargo.lock')) fs.copyFileSync('native/runtime-Cargo.lock', path.join(runtime, 'Cargo.lock'));
 if (fs.existsSync('native/runtime-package-lock.json')) fs.copyFileSync('native/runtime-package-lock.json', path.join(pake, 'package-lock.json'));
+// Pake 3.15.7 expects a Windows ARM64 MSI named *_aarch64_*, but Tauri's WiX bundler emits *_arm64_*.
+(() => {
+  const cli = path.join(pake, 'dist/cli.js');
+  const old = "const targetArch = this.getArchDisplayName(this.buildArch);";
+  const updated = "const targetArch = this.buildArch === 'arm64' ? 'arm64' : this.getArchDisplayName(this.buildArch);";
+  const s = fs.readFileSync(cli, 'utf8');
+  if (s.includes(updated)) return;
+  if (s.split(old).length !== 2) throw Error(`Unexpected source anchor: dist/cli.js: ${old}`);
+  fs.writeFileSync(cli, s.replace(old, updated));
+})();
 console.log('Prepared local Pake with retained startup fix and native ad blocker.');
