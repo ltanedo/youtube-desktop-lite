@@ -17,6 +17,10 @@ jobs:
       PAKE_TARGET_ARCH: arm64
       CI: "1"
     steps:
+      # Keep LF endings so the native patch applies to npm-installed Pake sources.
+      - name: Disable CRLF conversion
+        run: git config --global core.autocrlf false
+
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4

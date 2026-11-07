@@ -1,2 +1,4 @@
 # Preserve downloaded filter/resource snapshots byte-for-byte, including upstream whitespace.
 native/core/data/* -text -whitespace
+# git apply needs LF endings regardless of core.autocrlf on Windows checkouts.
+*.patch text eol=lf
