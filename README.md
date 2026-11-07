@@ -132,6 +132,23 @@ JavaScript/CSS injections alone do not include the native blocker. See
 [native/README.md](native/README.md) for architecture, filter provenance,
 limitations, recovery and the manual acceptance checklist.
 
+### Windows on ARM (ARM64)
+
+Set `PAKE_TARGET_ARCH=arm64` to build the `aarch64-pc-windows-msvc` package on
+an ARM64 Windows host (or `x64` to force the Intel/AMD package). The
+[Windows ARM64 build workflow](.github/workflows/windows-arm64.yml) runs this
+on a GitHub-hosted `windows-11-arm` runner with the same pinned, patched Pake
+toolchain, confirms the executable's PE machine type is ARM64 and the MSI
+platform is Arm64, and uploads `YouTube-Lite-<version>-Windows-ARM64.exe/.msi`
+with SHA-256 checksums as a workflow artifact. Snapdragon-based Windows devices
+run this package natively through the ARM64 WebView2 runtime; WiX itself runs
+under x86 emulation during the build only.
+
+```powershell
+$env:PAKE_TARGET_ARCH = 'arm64'
+npm run build
+```
+
 ---
 
 ## License

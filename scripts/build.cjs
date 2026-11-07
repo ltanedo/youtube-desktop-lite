@@ -6,9 +6,13 @@ if (!['win32', 'darwin'].includes(process.platform)) {
 }
 execFileSync(process.execPath,['scripts/prepare.cjs'],{stdio:'inherit'});
 const icon = process.platform === 'darwin' ? 'assets/youtube.icns' : 'assets/youtube.ico';
+// Optional explicit CPU architecture (x64 or arm64). Unset keeps Pake's host auto-detection.
+const targetArch = process.env.PAKE_TARGET_ARCH;
+if (targetArch && !['x64', 'arm64'].includes(targetArch)) throw Error(`PAKE_TARGET_ARCH must be x64 or arm64, got "${targetArch}"`);
 execFileSync(process.execPath,['node_modules/pake-cli/dist/cli.js',
  'https://www.youtube.com','--name','YouTube','--identifier','com.pake.a1c202c',
  '--icon',icon,'--inject','youtube-custom.css,youtube-reflow.js,youtube-fullscreen.js,youtube-scroll.js',
  '--width','1280','--height','800','--min-width','720','--min-height','480',
- '--maximize','--dark-mode','--app-version',require('../package.json').version,'--keep-binary'
+ '--maximize','--dark-mode','--app-version',require('../package.json').version,'--keep-binary',
+ ...(targetArch ? ['--targets', targetArch] : [])
 ],{stdio:'inherit'});

@@ -1,0 +1,117 @@
+# Builds the Windows ARM64 (aarch64-pc-windows-msvc) YouTube Desktop package on a
+# GitHub-hosted Windows 11 ARM runner using the same pinned, patched Pake 3.15.7
+# toolchain as the local x64/macOS builds (scripts/prepare.cjs + scripts/build.cjs).
+name: Windows ARM64 build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-11-arm
+    timeout-minutes: 120
+    env:
+      PAKE_TARGET_ARCH: arm64
+      CI: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Toolchain
+        shell: pwsh
+        run: |
+          rustup update stable
+          rustup default stable
+          rustup target add aarch64-pc-windows-msvc
+          rustc --version
+          cargo --version
+          node -v
+          npm -v
+          node -p "process.arch"
+
+      - name: Install pinned Pake
+        shell: pwsh
+        run: |
+          npm ci --ignore-scripts
+          if ($LASTEXITCODE -ne 0) { throw 'npm ci failed' }
+
+      - name: Patch project-local Pake runtime
+        shell: pwsh
+        run: |
+          node scripts/prepare.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'prepare failed' }
+
+      # Pake aborts a Tauri build that runs longer than 15 minutes. Compiling the
+      # patched runtime's dependencies first keeps the real build well inside that.
+      - name: Pre-compile Rust dependencies
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          cargo build --release --target aarch64-pc-windows-msvc --features cli-build --manifest-path node_modules/pake-cli/src-tauri/Cargo.toml
+
+      - name: Build YouTube.exe and YouTube.msi (ARM64)
+        shell: pwsh
+        run: |
+          npm run build
+          if ($LASTEXITCODE -ne 0) { throw 'Pake build failed' }
+
+      - name: Test blocker core and scriptlets
+        shell: pwsh
+        run: |
+          npm test
+          if ($LASTEXITCODE -ne 0) { throw 'tests failed' }
+
+      - name: Verify architecture, config and package
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $conf = Get-Content node_modules/pake-cli/src-tauri/.pake/tauri.conf.json -Raw | ConvertFrom-Json
+          if ($conf.version -ne $version) { throw "tauri.conf.json version $($conf.version) != package.json $version" }
+          if ($conf.productName -ne 'YouTube') { throw "unexpected productName $($conf.productName)" }
+          if ($conf.identifier -ne 'com.pake.a1c202c') { throw "unexpected identifier $($conf.identifier)" }
+          $pake = Get-Content node_modules/pake-cli/src-tauri/.pake/pake.json -Raw | ConvertFrom-Json
+          if ($pake.windows[0].url -ne 'https://www.youtube.com') { throw "unexpected url $($pake.windows[0].url)" }
+          if ($pake.windows[0].incognito) { throw 'incognito must be off' }
+
+          function Get-PEMachine([string]$path) {
+            $bytes = [System.IO.File]::ReadAllBytes($path)
+            $peOffset = [BitConverter]::ToInt32($bytes, 0x3C)
+            if ($bytes[$peOffset] -ne 0x50 -or $bytes[$peOffset+1] -ne 0x45) { throw "$path is not a PE file" }
+            return [BitConverter]::ToUInt16($bytes, $peOffset + 4)
+          }
+          foreach ($f in 'YouTube.exe','YouTube.msi') {
+            if (-not (Test-Path $f)) { throw "$f missing" }
+          }
+          $machine = Get-PEMachine 'YouTube.exe'
+          '{0}: PE machine 0x{1:X4}' -f 'YouTube.exe', $machine
+          if ($machine -ne 0xAA64) { throw "YouTube.exe is not ARM64 (machine 0x$($machine.ToString('X4')))" }
+          $summary = (Get-Item 'YouTube.msi' | Select-Object -ExpandProperty FullName)
+          $installer = New-Object -ComObject WindowsInstaller.Installer
+          $db = $installer.GetType().InvokeMember('OpenDatabase','InvokeMethod',$null,$installer,@($summary,0))
+          $si = $db.GetType().InvokeMember('SummaryInformation','GetProperty',$null,$db,@(0))
+          $template = $si.GetType().InvokeMember('Property','GetProperty',$null,$si,@(7))
+          "YouTube.msi template: $template"
+          if ($template -notmatch '^Arm64;') { throw "MSI template is not Arm64: $template" }
+
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item YouTube.exe "dist/YouTube-Lite-$version-Windows-ARM64.exe"
+          Copy-Item YouTube.msi "dist/YouTube-Lite-$version-Windows-ARM64.msi"
+          Push-Location dist
+          $lines = Get-ChildItem *.exe,*.msi | ForEach-Object { '{0}  {1}' -f (Get-FileHash $_ -Algorithm SHA256).Hash, $_.Name }
+          [System.IO.File]::WriteAllText((Join-Path (Get-Location) "SHA256SUMS-Windows-ARM64-v$version.txt"), (($lines -join "`n") + "`n"))
+          Get-Content "SHA256SUMS-Windows-ARM64-v$version.txt"
+          Pop-Location
+          "BUILD_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "Source commit: $env:GITHUB_SHA"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: youtube-desktop-lite-windows-arm64-${{ env.BUILD_VERSION }}
+          path: dist/
+          if-no-files-found: error
